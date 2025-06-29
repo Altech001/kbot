@@ -33,67 +33,98 @@ function cleanupSession(sessionDir) {
 
 // The main function to connect to WhatsApp
 async function connectToWhatsApp() {
-    const sessionDir = path.join(__dirname, '.', 'temp', 'wasi-session');
-    const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
+    try {
+        console.log('Starting WhatsApp connection...');
+        console.log('Using session directory:', path.join(__dirname, '.', 'temp', 'wasi-session'));
 
-    sock = makeWASocket({
-        auth: state,
-        printQRInTerminal: false,
-        logger: pino({ level: 'info' }),
-        browser: Browsers.macOS('Desktop'),
-    });
+        const sessionDir = process.env.WHATSAPP_SESSION_DIR || path.join(__dirname, '.', 'temp', 'wasi-session');
+        console.log('Using session directory:', sessionDir);
+        console.log('Initializing auth state...');
+        const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
+        console.log('Auth state initialized successfully');
 
-    // Set up event listeners
-    sock.ev.on('creds.update', saveCreds);
-
-    // Handle incoming messages
-    sock.ev.on('messages.upsert', async ({ messages }) => {
-        messages.forEach(msg => {
-            console.log('Received message:', {
-                from: msg.key.remoteJid,
-                message: msg.message?.conversation,
-                type: msg.message?.messageType
-            });
+        console.log('Creating WhatsApp socket...');
+        sock = makeWASocket({
+            auth: state,
+            printQRInTerminal: false,
+            logger: pino({ level: 'info' }),
+            browser: Browsers.macOS('Desktop'),
+            version: [2, 2204, 12], // Specify a specific version that works
+            printQR: (qr) => {
+                console.log('QR Code received:', qr);
+            },
+            onUnexpectedError: (error) => {
+                console.error('Unexpected error:', error);
+                throw error;
+            },
+            onConnectionError: (error) => {
+                console.error('Connection error:', error);
+                throw error;
+            },
+            onConnectionUpdate: (update) => {
+                console.log('Connection update:', update);
+                if (update.connection === 'open') {
+                    console.log('WhatsApp connection established successfully');
+                } else if (update.connection === 'close') {
+                    console.log('WhatsApp connection closed');
+                }
+            }
         });
-    });
 
+        console.log('Setting up event listeners...');
+        sock.ev.on('creds.update', saveCreds);
+
+        // Handle incoming messages
+        sock.ev.on('messages.upsert', async ({ messages }) => {
+            try {
+                console.log('Received messages:', messages);
+                messages.forEach(msg => {
+                    console.log('Received message:', {
+                        from: msg.key.remoteJid,
+                        message: msg.message?.conversation,
+                        type: msg.message?.messageType
+                    });
+                });
+            } catch (error) {
+                console.error('Error handling messages:', error);
+            }
+        });
     // Handle connection updates
     sock.ev.on('connection.update', async (update) => {
-        const { connection, lastDisconnect, qr } = update;
+        try {
+            const { connection, lastDisconnect, qr } = update;
 
-        if (qr) {
-            qrCode = qr;
-            console.log('New QR code received:', qr);
-        }
-
-        if (connection === 'open') {
-            qrCode = null;
-            console.log('WhatsApp connection opened successfully.');
-            
-            // Get user info
-            const { id, name } = sock.user;
-            console.log('Connected as:', name, id);
-        }
-
-        if (connection === 'close') {
-            qrCode = null;
-            const statusCode = lastDisconnect?.error?.output?.statusCode;
-            const reason = DisconnectReason[statusCode] || 'Unknown';
-            console.log(`Connection closed. Reason: ${reason}`);
-
-            if (statusCode !== DisconnectReason.loggedOut) {
-                console.log('Attempting to reconnect...');
-                await delay(10000);
-                connectToWhatsApp();
-            } else {
-                console.log('Logged out. Please delete the session and restart.');
-                cleanupSession(sessionDir);
+            if (qr) {
+                qrCode = qr;
+                console.log('New QR code received:', qr);
             }
+
+            if (connection === 'open') {
+                qrCode = null;
+                console.log('WhatsApp connection opened successfully.');
+                
+                // Store the connection object
+                sock = sock;
+            } else if (connection === 'close') {
+                console.log('WhatsApp connection closed');
+                
+                // Check if it was a normal logout
+                if (lastDisconnect?.error?.output?.statusCode === DisconnectReason.loggedOut) {
+                    console.log('Logged out. Please delete the session and restart.');
+                    cleanupSession(sessionDir);
+                }
+            }
+        } catch (error) {
+            console.error('Error handling connection update:', error);
         }
     });
-
     return sock;
+    } catch (error) {
+        console.error('Error in connectToWhatsApp:', error);
+        throw error;
+    }
 }
+
 
 // Function to send message to a contact
 async function sendMessage(to, message) {
