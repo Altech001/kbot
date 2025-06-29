@@ -33,7 +33,7 @@ function cleanupSession(sessionDir) {
 
 // The main function to connect to WhatsApp
 async function connectToWhatsApp() {
-    const sessionDir = path.join(__dirname, '..', 'temp', 'wasi-session');
+    const sessionDir = path.join(__dirname, '.', 'temp', 'wasi-session');
     const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
 
     sock = makeWASocket({
