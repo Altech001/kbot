@@ -68,19 +68,6 @@ async function connectToWhatsApp() {
                 } else if (update.connection === 'close') {
                     console.log('WhatsApp connection closed');
                 }
-            },
-            connectionOptions: {
-                useWebSocket: false, // Use HTTP instead of WebSocket
-                maxRetries: 5, // Limit retries
-                retryDelayMs: 5000 // 5 second delay between retries
-            },
-            ws: {
-                options: {
-                    agent: new https.Agent({
-                        keepAlive: true,
-                        timeout: 30000 // 30 second timeout
-                    })
-                }
             }
         });
 
