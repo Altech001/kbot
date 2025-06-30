@@ -70,7 +70,17 @@ async function connectToWhatsApp() {
                 }
             },
             connectionOptions: {
-                useWebSocket: false // Use HTTP instead of WebSocket
+                useWebSocket: false, // Use HTTP instead of WebSocket
+                maxRetries: 5, // Limit retries
+                retryDelayMs: 5000 // 5 second delay between retries
+            },
+            ws: {
+                options: {
+                    agent: new https.Agent({
+                        keepAlive: true,
+                        timeout: 30000 // 30 second timeout
+                    })
+                }
             }
         });
 
