@@ -68,6 +68,9 @@ async function connectToWhatsApp() {
                 } else if (update.connection === 'close') {
                     console.log('WhatsApp connection closed');
                 }
+            },
+            connectionOptions: {
+                useWebSocket: false // Use HTTP instead of WebSocket
             }
         });
 
